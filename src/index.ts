@@ -6,7 +6,7 @@ import { guard as noTailGuard } from "./guards/no-tail";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const AgentSkillsPlugin: Plugin = async () => {
-  const skillsDir = path.resolve(__dirname, "skills");
+  const skillsDir = path.resolve(__dirname, "../skills");
 
   return {
     config: async (config) => {
