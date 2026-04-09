@@ -2,14 +2,18 @@
   "name": "opencode-agent-skills",
   "version": "0.1.0",
   "description": "OpenCode plugin that provides agent skills and programmatic guardrails",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
     "@opencode-ai/plugin": "^1.4.2",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/shell-quote": "^1.7.5"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "shell-quote": "^1.8.3"
   }
 }
