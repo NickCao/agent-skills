@@ -39,6 +39,7 @@ function buildPhasePrompt(phase: WorkflowPhase): string {
     "",
     "## When Done",
     "When your work for this phase is complete, invoke @workflow-review to check your work.",
+    "If the review approves, the workflow will automatically transition to the next phase.",
   );
 
   return lines.join("\n");

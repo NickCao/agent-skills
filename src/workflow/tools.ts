@@ -100,7 +100,7 @@ export function createWorkflowTools(
           advanced_to: next.id,
           phase_name: next.name,
           reason: args.reason,
-          message: `Phase advanced to ${next.name}. Switch to the workflow-${next.id} agent (Tab key).`,
+          message: `Phase advanced to ${next.name}. The session will automatically switch to the workflow-${next.id} agent.`,
         });
       },
     }),
