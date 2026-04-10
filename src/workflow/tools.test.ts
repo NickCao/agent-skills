@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { createWorkflowTools } from "./tools.ts";
+import { createWorkflowTools, type SessionResolver } from "./tools.ts";
 import { WorkflowState } from "./state.ts";
 import type { WorkflowConfig } from "./schema.ts";
 import type { ToolContext } from "@opencode-ai/plugin";
@@ -25,6 +25,9 @@ const WORKFLOW: WorkflowConfig = {
   project_conventions: {},
 };
 
+/** Identity resolver -- no parent chain, returns sessionID as-is */
+const identityResolver: SessionResolver = async (id) => id;
+
 function makeContext(overrides: Partial<ToolContext> = {}): ToolContext {
   return {
     sessionID: "test-session",
@@ -49,7 +52,7 @@ describe("createWorkflowTools", () => {
 
   describe("workflow_status", () => {
     test("returns current phase info", async () => {
-      const tools = createWorkflowTools(WORKFLOW, sessions);
+      const tools = createWorkflowTools(WORKFLOW, sessions, identityResolver);
       const result = await tools.workflow_status!.execute({}, makeContext());
       const parsed = JSON.parse(result);
       expect(parsed.current).toBe("plan");
@@ -60,7 +63,11 @@ describe("createWorkflowTools", () => {
 
     test("initializes session state on first call", async () => {
       const emptySessions = new Map<string, WorkflowState>();
-      const tools = createWorkflowTools(WORKFLOW, emptySessions);
+      const tools = createWorkflowTools(
+        WORKFLOW,
+        emptySessions,
+        identityResolver,
+      );
       const result = await tools.workflow_status!.execute({}, makeContext());
       const parsed = JSON.parse(result);
       expect(parsed.current).toBe("plan");
@@ -70,7 +77,7 @@ describe("createWorkflowTools", () => {
 
   describe("workflow_advance", () => {
     test("advances to next phase when called by review agent", async () => {
-      const tools = createWorkflowTools(WORKFLOW, sessions);
+      const tools = createWorkflowTools(WORKFLOW, sessions, identityResolver);
       const result = await tools.workflow_advance!.execute(
         { reason: "Plan is documented" },
         makeContext({ agent: "workflow-review" }),
@@ -81,7 +88,7 @@ describe("createWorkflowTools", () => {
     });
 
     test("throws when called by non-review agent", async () => {
-      const tools = createWorkflowTools(WORKFLOW, sessions);
+      const tools = createWorkflowTools(WORKFLOW, sessions, identityResolver);
       expect(
         tools.workflow_advance!.execute(
           { reason: "skip" },
@@ -91,13 +98,11 @@ describe("createWorkflowTools", () => {
     });
 
     test("returns done when all phases complete", async () => {
-      const tools = createWorkflowTools(WORKFLOW, sessions);
-      // advance plan -> implement
+      const tools = createWorkflowTools(WORKFLOW, sessions, identityResolver);
       await tools.workflow_advance!.execute(
         { reason: "done" },
         makeContext({ agent: "workflow-review" }),
       );
-      // advance implement -> done
       const result = await tools.workflow_advance!.execute(
         { reason: "done" },
         makeContext({ agent: "workflow-review" }),
@@ -108,7 +113,7 @@ describe("createWorkflowTools", () => {
     });
 
     test("returns already done if called after completion", async () => {
-      const tools = createWorkflowTools(WORKFLOW, sessions);
+      const tools = createWorkflowTools(WORKFLOW, sessions, identityResolver);
       await tools.workflow_advance!.execute(
         { reason: "done" },
         makeContext({ agent: "workflow-review" }),
@@ -117,13 +122,40 @@ describe("createWorkflowTools", () => {
         { reason: "done" },
         makeContext({ agent: "workflow-review" }),
       );
-      // now done, try again
       const result = await tools.workflow_advance!.execute(
         { reason: "done" },
         makeContext({ agent: "workflow-review" }),
       );
       const parsed = JSON.parse(result);
       expect(parsed.status).toBe("done");
+    });
+  });
+
+  describe("session resolver", () => {
+    test("subagent session resolves to parent state", async () => {
+      // Resolver that maps child -> parent
+      const resolver: SessionResolver = async (id) =>
+        id === "child-session" ? "test-session" : id;
+
+      const tools = createWorkflowTools(WORKFLOW, sessions, resolver);
+
+      // Advance from the child session (subagent)
+      await tools.workflow_advance!.execute(
+        { reason: "done" },
+        makeContext({
+          sessionID: "child-session",
+          agent: "workflow-review",
+        }),
+      );
+
+      // Check status from the parent session -- should see the advance
+      const result = await tools.workflow_status!.execute(
+        {},
+        makeContext({ sessionID: "test-session" }),
+      );
+      const parsed = JSON.parse(result);
+      expect(parsed.current).toBe("implement");
+      expect(parsed.completed).toEqual(["plan"]);
     });
   });
 });

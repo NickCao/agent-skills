@@ -7,15 +7,24 @@ export type WorkflowTools = {
   [key: string]: ToolDefinition;
 };
 
-function getOrCreateState(
+/**
+ * Resolves a session ID to its root session ID by following the parentID chain.
+ * Subagents run in child sessions -- we need to key state by the root session
+ * so that parent and child sessions share the same workflow state.
+ */
+export type SessionResolver = (sessionID: string) => Promise<string>;
+
+async function getOrCreateState(
   sessions: Map<string, WorkflowState>,
   sessionID: string,
   workflow: WorkflowConfig,
-): WorkflowState {
-  let state = sessions.get(sessionID);
+  resolveSession: SessionResolver,
+): Promise<WorkflowState> {
+  const rootID = await resolveSession(sessionID);
+  let state = sessions.get(rootID);
   if (!state) {
     state = new WorkflowState(workflow);
-    sessions.set(sessionID, state);
+    sessions.set(rootID, state);
   }
   return state;
 }
@@ -23,6 +32,7 @@ function getOrCreateState(
 export function createWorkflowTools(
   workflow: WorkflowConfig,
   sessions: Map<string, WorkflowState>,
+  resolveSession: SessionResolver,
 ): WorkflowTools {
   return {
     workflow_status: tool({
@@ -31,10 +41,11 @@ export function createWorkflowTools(
         "Use this to understand what phase you are in and what is expected.",
       args: {},
       async execute(_args, context) {
-        const state = getOrCreateState(
+        const state = await getOrCreateState(
           sessions,
           context.sessionID,
           workflow,
+          resolveSession,
         );
         return JSON.stringify(state.status(), null, 2);
       },
@@ -57,10 +68,11 @@ export function createWorkflowTools(
           );
         }
 
-        const state = getOrCreateState(
+        const state = await getOrCreateState(
           sessions,
           context.sessionID,
           workflow,
+          resolveSession,
         );
 
         if (state.isDone()) {

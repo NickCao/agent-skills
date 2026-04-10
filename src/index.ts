@@ -7,10 +7,10 @@ import { setupWorkflow } from "./workflow/index.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const AgentSkillsPlugin: Plugin = async ({ directory }) => {
+export const AgentSkillsPlugin: Plugin = async ({ directory, client }) => {
   const skillsDir = path.resolve(__dirname, "../skills");
   const agentBySession = new Map<string, string>();
-  const workflow = setupWorkflow(directory);
+  const workflow = setupWorkflow(directory, client);
 
   return {
     config: async (config) => {
@@ -32,6 +32,12 @@ export const AgentSkillsPlugin: Plugin = async ({ directory }) => {
       if (workflow) {
         for (const [name, agentConfig] of Object.entries(workflow.agents)) {
           config.agent[name] = agentConfig;
+        }
+
+        // Default new sessions to the first workflow phase agent
+        const firstPhase = workflow.config.phases[0];
+        if (firstPhase) {
+          config.default_agent = `workflow-${firstPhase.id}`;
         }
       }
     },
