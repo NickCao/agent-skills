@@ -3,12 +3,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { quote } from "shell-quote";
 import { guard as noTailGuard } from "./guards/no-tail";
+import { setupWorkflow } from "./workflow/index.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const AgentSkillsPlugin: Plugin = async ({ directory }) => {
   const skillsDir = path.resolve(__dirname, "../skills");
   const agentBySession = new Map<string, string>();
+  const workflow = setupWorkflow(directory);
 
   return {
     config: async (config) => {
@@ -25,6 +27,13 @@ export const AgentSkillsPlugin: Plugin = async ({ directory }) => {
         mode: "primary",
         color: "success",
       };
+
+      // Register workflow phase agents if .workflow/workflow.yaml exists
+      if (workflow) {
+        for (const [name, agentConfig] of Object.entries(workflow.agents)) {
+          config.agent[name] = agentConfig;
+        }
+      }
     },
 
     "chat.message": async (input) => {
@@ -51,5 +60,8 @@ export const AgentSkillsPlugin: Plugin = async ({ directory }) => {
         }
       }
     },
+
+    // Register workflow tools if .workflow/workflow.yaml exists
+    ...(workflow ? { tool: workflow.tools } : {}),
   };
 };
