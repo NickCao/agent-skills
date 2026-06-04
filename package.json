@@ -6,7 +6,6 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@opencode-ai/plugin": "^1.4.2",
     "@types/bun": "latest",
     "@types/shell-quote": "^1.7.5"
   },
@@ -14,6 +13,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@opencode-ai/plugin": "^1.4.2",
     "shell-quote": "^1.8.3",
     "yaml": "^2.7.1"
   }
